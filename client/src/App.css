@@ -1,0 +1,23 @@
+.app {
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+.header {
+  background-color: #007acc;
+  color: white;
+  padding: 1rem;
+}
+
+.container {
+  margin: 2rem auto;
+  max-width: 600px;
+}
+
+.form {
+  margin: 1rem 0;
+}
+
+.error {
+  color: red;
+}
