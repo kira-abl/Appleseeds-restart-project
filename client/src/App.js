@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import "./App.css";
 
 const occasionsList = [
@@ -18,12 +19,14 @@ function App() {
 
   const handleSubmit = async () => {
     try {
-      const response = await fetch("https://place-holder/api/greeting", {
+      const token = uuidv4();
+      console.log(token);
+      const response = await fetch("https://localhost:5001/api/greeting", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ occasion: selectedOccasion }),
+        body: JSON.stringify({ occasion: selectedOccasion, token }),
       });
 
       if (!response.ok) {
