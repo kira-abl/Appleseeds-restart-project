@@ -20,8 +20,7 @@ function App() {
   const handleSubmit = async () => {
     try {
       const token = uuidv4();
-      console.log(token);
-      const response = await fetch("https://localhost:5001/api/greeting", {
+      const response = await fetch("http://localhost:5001/api/greeting", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
