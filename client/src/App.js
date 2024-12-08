@@ -18,11 +18,13 @@ function App() {
 
   const handleSubmit = async () => {
     try {
-      const response = await fetch(
-        `https://url-place-holder/api/generate?occasion=${encodeURIComponent(
-          selectedOccasion
-        )}`
-      );
+      const response = await fetch("https://place-holder/api/greeting", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ occasion: selectedOccasion }),
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch the image.");
