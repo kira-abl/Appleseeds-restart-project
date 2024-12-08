@@ -6,9 +6,11 @@ import pymongo
 from flask import Flask, request, json, Response
 import logging as log
 import json
+from flask_cors import CORS
+
 
 app = Flask(__name__)
-
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
 #Rewrite to work with Mongo or abother DB.
 def update_file(item):
