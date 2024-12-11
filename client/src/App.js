@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import Spinner from "./components/spinner";
 import "./App.css";
 
 const occasionsList = [
@@ -14,12 +15,16 @@ const occasionsList = [
 ];
 function App() {
   const [selectedOccasion, setSelectedOccasion] = useState(occasionsList[0]);
-  const [imageUrl, setImageUrl] = useState(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [greeting, setGreeting] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async () => {
+    setLoading(true);
     try {
       const token = uuidv4();
+      /** Dont forget to replace fetch endoping when deploying the app to prod */
       const response = await fetch("http://localhost:5001/api/greeting", {
         method: "POST",
         headers: {
@@ -27,18 +32,20 @@ function App() {
         },
         body: JSON.stringify({ occasion: selectedOccasion, token }),
       });
-
       if (!response.ok) {
         throw new Error("Failed to fetch the image.");
       }
-
       const data = await response.json();
-      setImageUrl(data.imageUrl);
+      setImageUrl(data.img);
+      setGreeting(data.greeting);
+
       setError("");
     } catch (err) {
-      setError("Failed to fetch the image. Please try again.");
+      setError("Failed to fetch the Greeitng. Please try again.");
       setImageUrl(null);
+      setGreeting("");
     }
+    setLoading(false);
   };
 
   return (
@@ -65,8 +72,18 @@ function App() {
           </select>
           <button onClick={handleSubmit}>Generate</button>
         </div>
-        {imageUrl && <img src={imageUrl} alt="Generated greeting" />}
-        {error && <p className="error">{error}</p>}
+        {loading && (
+          <div>
+            <Spinner />
+          </div>
+        )}
+        <div>
+          {greeting && <p className="greeting-text">{greeting}</p>}
+          {imageUrl && (
+            <img class="generated-image" src={imageUrl} alt="Generated img" />
+          )}
+          {error && <p className="error">{error}</p>}
+        </div>
       </main>
     </div>
   );

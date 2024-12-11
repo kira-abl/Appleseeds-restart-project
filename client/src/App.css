@@ -21,3 +21,36 @@
 .error {
   color: red;
 }
+
+.greeting-text {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #3d008d;
+  text-align: center;
+  margin: 20px auto;
+  max-width: 80%;
+  line-height: 1.5;
+  padding: 10px;
+  background: linear-gradient(
+    135deg,
+    rgba(61, 0, 141, 0.8),
+    rgba(61, 0, 141, 0.4)
+  );
+  color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.generated-image {
+  display: block;
+  margin: 20px auto;
+  max-width: 100%;
+  height: auto;
+  border-radius: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease-in-out;
+}
+
+.generated-image:hover {
+  transform: scale(1.05);
+}
