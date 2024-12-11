@@ -8,6 +8,7 @@ import logging as log
 import json
 from flask_cors import CORS
 import requests
+import boto3
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
@@ -38,6 +39,23 @@ def get_photo_url(occasion): #Retrieve a single photo URL from Unsplash.
     except requests.RequestException as e:
         print(f"Error searching photos: {e}")
         return None
+
+
+def download_image(image_url, save_path): #Download an image from a given URL.
+    try:
+        response = requests.get(image_url, stream=True)
+        response.raise_for_status()
+
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        with open(save_path, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+        return True
+    except requests.RequestException as e:
+        print(f"Error downloading image: {e}")
+        return False
 
 def insert_data_into_db(item):
     response = requests.post(
@@ -84,6 +102,8 @@ def base():
         response = get_gemini(occasion)
         print("Response from Gemini:", response)
         photo_url = get_photo_url(occasion)
+        save_path = f"photos/{occasion}.jpg"
+        download_image(photo_url, save_path)
         response["img"] = photo_url
         response["token"] = token
 
