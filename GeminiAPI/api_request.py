@@ -112,7 +112,6 @@ def upload_image_to_s3(local_file_path, bucket_name, s3_file_name=None): #Upload
             Bucket=bucket_name,
             Key=s3_file_name,
             ExtraArgs={
-                'ACL': 'public-read',  # Make the object publicly readable
                 'ContentType': 'image/jpeg'  # Set appropriate MIME type
             }
         )
