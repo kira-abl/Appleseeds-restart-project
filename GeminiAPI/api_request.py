@@ -142,20 +142,35 @@ def upload_image_to_s3(local_file_path, bucket_name, s3_file_name=None): #Upload
     except Exception as e:
         print(f"Error uploading public image to S3: {e}")
         return None
+import boto3
 
 def insert_data_into_db(item):
-    response = requests.post(
-        "http://localhost:3001/occasion",
-        json=item
-    )
-    if response.status_code == 200:
-        data = response.json()
-        print("Data successfully sent to the DB API:", data)
-        return data
-    else:
-        print(f"Failed to send data to the DB API. Status code: {response.status_code}, Response: {response.text}")
-        return None
+    lambda_client = boto3.client('lambda')
 
+    payload = {
+        "httpMethod": "POST",
+        "body": json.dumps(item)
+    }
+    
+    try:
+        response = lambda_client.invoke(
+            FunctionName='OccasionFunction',
+            InvocationType='RequestResponse', 
+            Payload=json.dumps(payload)
+        )
+        
+        response_payload = json.loads(response['Payload'].read())
+        
+        if response['StatusCode'] == 200:
+            print("Data successfully sent to Lambda:", response_payload)
+            return response_payload
+        else:
+            print(f"Failed to send data to Lambda. Status code: {response['StatusCode']}, Response: {response_payload}")
+            return None
+            
+    except Exception as e:
+        print(f"Error invoking Lambda function: {str(e)}")
+        return None
 
 def get_gemini(occasion):
 
