@@ -14,9 +14,46 @@ from botocore.exceptions import ClientError
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
-def get_photo_url(occasion): #Retrieve a single photo URL from Unsplash.
-    load_dotenv()
-    UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+import json
+
+def get_secrets():
+    
+    secrets = ["Unsplash", "Gemini"]
+    region_name = "us-east-1"
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+    retrieved_secrets = {}
+
+    # Loop through secret names and fetch each one
+    for secret_name in secrets:
+        try:
+            get_secret_value_response = client.get_secret_value(
+                SecretId=secret_name
+            )
+            # Parse the secret string
+            secret_string = get_secret_value_response['SecretString']
+            secret_data = json.loads(secret_string)  # Convert JSON string to dictionary
+            
+            # Extract the first value in the dictionary
+            if secret_data:
+                retrieved_secrets[secret_name] = next(iter(secret_data.values()))  # Get the first value
+            else:
+                print(f"Secret {secret_name} is empty or improperly formatted.")
+        except ClientError as e:
+            print(f"Failed to retrieve secret {secret_name}: {e}")
+            raise
+
+    # Return only the API key values
+    return retrieved_secrets.get("Unsplash"), retrieved_secrets.get("Gemini")
+
+
+def get_photo_url(occasion, secret): #Retrieve a single photo URL from Unsplash.
+    # load_dotenv()
+    # UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+    UNSPLASH_ACCESS_KEY = secret
     base_url = "https://api.unsplash.com"
     headers = {
         "Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"
@@ -142,7 +179,21 @@ def upload_image_to_s3(local_file_path, bucket_name, s3_file_name=None): #Upload
     except Exception as e:
         print(f"Error uploading public image to S3: {e}")
         return None
-import boto3
+
+# Old code left here for possible debugging in the future:
+
+# def insert_data_into_db(item):
+#     response = requests.post(
+#         "http://localhost:3001/occasion",
+#         json=item
+#     )
+#     if response.status_code == 200:
+#         data = response.json()
+#         print("Data successfully sent to the DB API:", data)
+#         return data
+#     else:
+#         print(f"Failed to send data to the DB API. Status code: {response.status_code}, Response: {response.text}")
+#         return None
 
 def insert_data_into_db(item):
     lambda_client = boto3.client('lambda')
@@ -162,8 +213,14 @@ def insert_data_into_db(item):
         response_payload = json.loads(response['Payload'].read())
         
         if response['StatusCode'] == 200:
-            print("Data successfully sent to Lambda:", response_payload)
-            return response_payload
+            data = json.loads(response_payload['body'])
+            img_url = data.get('img')  
+            greeting = data.get('greeting')  
+            
+            print("Data successfully received from Lambda:")
+            print(f"Image URL: {img_url}")
+            print(f"Greeting: {greeting}")
+            return data
         else:
             print(f"Failed to send data to Lambda. Status code: {response['StatusCode']}, Response: {response_payload}")
             return None
@@ -172,11 +229,10 @@ def insert_data_into_db(item):
         print(f"Error invoking Lambda function: {str(e)}")
         return None
 
-def get_gemini(occasion):
-
-    load_dotenv()
-
-    api_key = os.getenv("API_KEY")
+def get_gemini(occasion, secret):
+    #load_dotenv()
+    #api_key = os.getenv("API_KEY")
+    api_key = secret
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -200,9 +256,12 @@ def base():
         data = request.get_json()
         occasion = data.get("occasion")
         token = data.get("token") 
-        response = get_gemini(occasion)
+        unsplash_secret, gemini_secret = get_secrets()
+        print("Unsplash Secret:", unsplash_secret)
+        print("Gemini Secret:", gemini_secret)
+        response = get_gemini(occasion, gemini_secret)
         print("Response from Gemini:", response)
-        photo_url = get_photo_url(occasion)
+        photo_url = get_photo_url(occasion, unsplash_secret)
         save_path = f"photos/{occasion}.jpg"
         download_image(photo_url, save_path)
         # Upload the image to S3 bucket
