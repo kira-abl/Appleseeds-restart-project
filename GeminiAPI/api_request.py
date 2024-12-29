@@ -12,7 +12,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://deipmf3c3y33h.cloudfront.net", "http://frontbucket-g4.s3-website-us-east-1.amazonaws.com"]}})
 
 import json
 
