@@ -25,7 +25,7 @@ function App() {
     try {
       const token = uuidv4();
       /** Dont forget to replace fetch endoping when deploying the app to prod */
-      const response = await fetch("http://localhost:5001/api/greeting", {
+      const response = await fetch("https://app.aws4greetingapp.42web.io/api/greeting", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

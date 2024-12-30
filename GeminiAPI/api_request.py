@@ -12,11 +12,48 @@ import boto3
 from botocore.exceptions import ClientError
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://deipmf3c3y33h.cloudfront.net", "http://frontbucket-g4.s3-website-us-east-1.amazonaws.com"]}})
 
-def get_photo_url(occasion): #Retrieve a single photo URL from Unsplash.
-    load_dotenv()
-    UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+import json
+
+def get_secrets():
+    
+    secrets = ["Unsplash", "Gemini"]
+    region_name = "us-east-1"
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+    retrieved_secrets = {}
+
+    # Loop through secret names and fetch each one
+    for secret_name in secrets:
+        try:
+            get_secret_value_response = client.get_secret_value(
+                SecretId=secret_name
+            )
+            # Parse the secret string
+            secret_string = get_secret_value_response['SecretString']
+            secret_data = json.loads(secret_string)  # Convert JSON string to dictionary
+            
+            # Extract the first value in the dictionary
+            if secret_data:
+                retrieved_secrets[secret_name] = next(iter(secret_data.values()))  # Get the first value
+            else:
+                print(f"Secret {secret_name} is empty or improperly formatted.")
+        except ClientError as e:
+            print(f"Failed to retrieve secret {secret_name}: {e}")
+            raise
+
+    # Return only the API key values
+    return retrieved_secrets.get("Unsplash"), retrieved_secrets.get("Gemini")
+
+
+def get_photo_url(occasion, secret): #Retrieve a single photo URL from Unsplash.
+    # load_dotenv()
+    # UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+    UNSPLASH_ACCESS_KEY = secret
     base_url = "https://api.unsplash.com"
     headers = {
         "Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"
@@ -58,49 +95,12 @@ def download_image(image_url, save_path): #Download an image from a given URL.
         print(f"Error downloading image: {e}")
         return False
 
-
-def load_aws_credentials(): # Load AWS credentials from .env file
-    # Load environment variables from .env file
-    load_dotenv()
-
-    # Retrieve credentials
-    aws_access_key = os.getenv('AWS_ACCESS_KEY_ID')
-    aws_secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
-    aws_session_token = os.getenv('AWS_SESSION_TOKEN')  # Optional session token
-    aws_region = os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
-
-    # Validate required credentials
-    if not aws_access_key or not aws_secret_key:
-        raise ValueError("AWS access key and secret key are required")
-
-    return {
-        'aws_access_key_id': aws_access_key,
-        'aws_secret_access_key': aws_secret_key,
-        'aws_session_token': aws_session_token,  # Can be None
-        'region_name': aws_region
-    }
-
-
 def upload_image_to_s3(local_file_path, bucket_name, s3_file_name=None): #Upload an image file to S3 with public read access
 
     try:
-        # Load AWS credentials
-        credentials = load_aws_credentials()
-
-        # Prepare credentials dictionary for boto3
-        boto3_credentials = {
-            'aws_access_key_id': credentials['aws_access_key_id'],
-            'aws_secret_access_key': credentials['aws_secret_access_key'],
-            'region_name': credentials['region_name']
-        }
-
-        # Add session token if present
-        if credentials['aws_session_token']:
-            boto3_credentials['aws_session_token'] = credentials['aws_session_token']
-
         # Create S3 client and resource
-        s3_client = boto3.client('s3', **boto3_credentials)
-        s3_resource = boto3.resource('s3', **boto3_credentials)
+        s3_client = boto3.client('s3', 'us-east-1')
+        s3_resource = boto3.resource('s3', 'us-east-1')
 
         # If no custom S3 filename is provided, use the original filename
         if s3_file_name is None:
@@ -116,25 +116,6 @@ def upload_image_to_s3(local_file_path, bucket_name, s3_file_name=None): #Upload
             }
         )
 
-        # Configure bucket policy for public access if not already set
-        try:
-            bucket_policy = s3_resource.BucketPolicy(bucket_name)
-            bucket_policy.put(Policy=json.dumps({
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Sid": "PublicReadGetObject",
-                        "Effect": "Allow",
-                        "Principal": "*",
-                        "Action": "s3:GetObject",
-                        "Resource": f"arn:aws:s3:::{bucket_name}/*"
-                    }
-                ]
-            }))
-        except ClientError as e:
-            # Policy might already exist or cannot be set
-            print(f"Warning: Could not set bucket policy: {e}")
-
         # Construct and return the public S3 URL
         public_url = f"https://{bucket_name}.s3.amazonaws.com/{s3_file_name}"
         return public_url
@@ -143,25 +124,59 @@ def upload_image_to_s3(local_file_path, bucket_name, s3_file_name=None): #Upload
         print(f"Error uploading public image to S3: {e}")
         return None
 
+# Old code left here for possible debugging in the future:
+
+# def insert_data_into_db(item):
+#     response = requests.post(
+#         "http://localhost:3001/occasion",
+#         json=item
+#     )
+#     if response.status_code == 200:
+#         data = response.json()
+#         print("Data successfully sent to the DB API:", data)
+#         return data
+#     else:
+#         print(f"Failed to send data to the DB API. Status code: {response.status_code}, Response: {response.text}")
+#         return None
+
 def insert_data_into_db(item):
-    response = requests.post(
-        "http://localhost:3001/occasion",
-        json=item
-    )
-    if response.status_code == 200:
-        data = response.json()
-        print("Data successfully sent to the DB API:", data)
-        return data
-    else:
-        print(f"Failed to send data to the DB API. Status code: {response.status_code}, Response: {response.text}")
+    lambda_client = boto3.client('lambda')
+
+    payload = {
+        "httpMethod": "POST",
+        "body": json.dumps(item)
+    }
+    
+    try:
+        response = lambda_client.invoke(
+            FunctionName='OccasionFunction',
+            InvocationType='RequestResponse', 
+            Payload=json.dumps(payload)
+        )
+        
+        response_payload = json.loads(response['Payload'].read())
+        
+        if response['StatusCode'] == 200:
+            data = json.loads(response_payload['body'])
+            img_url = data.get('img')  
+            greeting = data.get('greeting')  
+            
+            print("Data successfully received from Lambda:")
+            print(f"Image URL: {img_url}")
+            print(f"Greeting: {greeting}")
+            return data
+        else:
+            print(f"Failed to send data to Lambda. Status code: {response['StatusCode']}, Response: {response_payload}")
+            return None
+            
+    except Exception as e:
+        print(f"Error invoking Lambda function: {str(e)}")
         return None
 
-
-def get_gemini(occasion):
-
-    load_dotenv()
-
-    api_key = os.getenv("API_KEY")
+def get_gemini(occasion, secret):
+    #load_dotenv()
+    #api_key = os.getenv("API_KEY")
+    api_key = secret
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -185,13 +200,16 @@ def base():
         data = request.get_json()
         occasion = data.get("occasion")
         token = data.get("token") 
-        response = get_gemini(occasion)
+        unsplash_secret, gemini_secret = get_secrets()
+        print("Unsplash Secret:", unsplash_secret)
+        print("Gemini Secret:", gemini_secret)
+        response = get_gemini(occasion, gemini_secret)
         print("Response from Gemini:", response)
-        photo_url = get_photo_url(occasion)
+        photo_url = get_photo_url(occasion, unsplash_secret)
         save_path = f"photos/{occasion}.jpg"
         download_image(photo_url, save_path)
         # Upload the image to S3 bucket
-        bucket_name = 'awsgroup4testbucket' #TODO: get this bucket name automatically
+        bucket_name = 'user-objects-storage-bucket' #TODO: get this bucket name automatically
         s3_url = upload_image_to_s3(save_path, bucket_name)
         print(f"Image uploaded successfully. S3 URL: {s3_url}")
         response["img"] = s3_url
